@@ -3,14 +3,8 @@
 # https://github.com/rsp/travis-hello#readme
 
 sudo: false
-language: cpp
+language: c
 compiler:
   - clang
-addons:
-  apt:
-    sources:
-    - ubuntu-toolchain-r-test
-    packages:
-    - clang-8
 script:
   - make
