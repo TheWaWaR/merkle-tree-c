@@ -1,7 +1,7 @@
 #ifndef CB_MERKLE_TREE_H_
 #define CB_MERKLE_TREE_H_
 
- #include <stdbool.h>
+#include <stdbool.h>
 #include <string.h>
 
 #include <blake2b.h>
@@ -19,13 +19,15 @@
 #define CBMT_ERROR_BUILD_PROOF -4
 #define CBMT_ERROR_INVALID_CAPACITY -5
 #define CBMT_ERROR_VERIFY_FAILED -6
+/* This happend only when have bug */
 #define CBMT_FATAL_BUILD_PROOF -99
 
 #define cbmt_is_left(index)  (((index) & 1) == 1)
 #define cbmt_parent(index)   ((index) == 0 ? 0 : ((index) - 1) >> 1)
 #define cbmt_sibling(index)  ((index) == 0 ? 0 : ((index + 1) ^ 1) - 1)
 
-typedef int (*cmpfun)(const void *, const void *);
+typedef int (*cbmt_cmpfun)(const void *, const void *);
+
 void cbmt_universal_swap(void *left, void *right, size_t width) {
   uint8_t tmp[128];
   size_t length;
@@ -39,7 +41,7 @@ void cbmt_universal_swap(void *left, void *right, size_t width) {
     width -= length;
   }
 }
-void cbmt_simple_bubble_sort(void *base, size_t length, size_t width, cmpfun cmp) {
+void cbmt_simple_bubble_sort(void *base, size_t length, size_t width, cbmt_cmpfun cmp) {
   for (size_t i = 0; i < length - 1; i++) {
     for (size_t j = i + 1; j < length; j++) {
       void *left = base + (i * width);
@@ -50,7 +52,7 @@ void cbmt_simple_bubble_sort(void *base, size_t length, size_t width, cmpfun cmp
     }
   }
 }
-int uint32_reverse_cmp(const void *void_left, const void *void_right) {
+int cbmt_uint32_reverse_cmp(const void *void_left, const void *void_right) {
   const uint32_t left = *((const uint32_t *)void_left);
   const uint32_t right = *((const uint32_t *)void_right);
   /* reverse order */
@@ -230,7 +232,9 @@ cbmt_node cbmt_node_merge(blake2b_state *blake2b_ctx,
 int cbmt_tree_build_proof(cbmt_proof *proof,
                           cbmt_tree *tree,
                           cbmt_indices *leaf_indices,
+                          /* for saving indices in proof */
                           cbmt_buffer indices_buffer,
+                          /* for saving lemmas in proof */
                           cbmt_buffer lemmas_buffer) {
   if (leaf_indices->length * sizeof(uint32_t) > indices_buffer.capacity) {
     return CBMT_ERROR_OVER_CAPACITY;
@@ -259,7 +263,7 @@ int cbmt_tree_build_proof(cbmt_proof *proof,
   cbmt_simple_bubble_sort(queue.buffer.data,
                           leaf_indices->length,
                           sizeof(uint32_t),
-                          uint32_reverse_cmp);
+                          cbmt_uint32_reverse_cmp);
   uint32_t first_value = *((uint32_t *)cbmt_queue_front(&queue));
   if (first_value >= ((leaves_count << 1) - 1)) {
     return CBMT_ERROR_BUILD_PROOF;
@@ -340,7 +344,9 @@ cbmt_node cbmt_tree_root(cbmt_tree *tree) {
 int cbmt_proof_root(cbmt_proof *proof,
                     cbmt_node *root,
                     cbmt_leaves *leaves,
+                    /* for saving nodes in cloned leaves */
                     cbmt_buffer nodes_buffer,
+                    /* for saving (index, node) pairs */
                     cbmt_buffer pairs_buffer) {
   if (leaves->length * sizeof(cbmt_node) > nodes_buffer.capacity) {
     return CBMT_ERROR_OVER_CAPACITY;
@@ -441,10 +447,12 @@ int cbmt_proof_root(cbmt_proof *proof,
 }
 
 int cbmt_proof_verify(cbmt_proof *proof,
-                       cbmt_node *root,
-                       cbmt_leaves *leaves,
-                       cbmt_buffer nodes_buffer,
-                       cbmt_buffer pairs_buffer) {
+                      cbmt_node *root,
+                      cbmt_leaves *leaves,
+                      /* for saving nodes in cloned leaves */
+                      cbmt_buffer nodes_buffer,
+                      /* for saving (index, node) pairs */
+                      cbmt_buffer pairs_buffer) {
   cbmt_node target_root;
   int ret = cbmt_proof_root(proof, &target_root, leaves, nodes_buffer, pairs_buffer);
   if (ret != 0) {
@@ -456,7 +464,10 @@ int cbmt_proof_verify(cbmt_proof *proof,
   return 0;
 }
 
-int cbmt_build_merkle_root(cbmt_node *root, cbmt_leaves *leaves, cbmt_buffer nodes_buffer) {
+int cbmt_build_merkle_root(cbmt_node *root,
+                           cbmt_leaves *leaves,
+                           /* for saving nodes in queue */
+                           cbmt_buffer nodes_buffer) {
   size_t length = leaves->length;
   if (length == 0) {
     memset(root->bytes, 0, CBMT_NODE_SIZE);
@@ -516,6 +527,7 @@ int cbmt_build_merkle_root(cbmt_node *root, cbmt_leaves *leaves, cbmt_buffer nod
 
 int cbmt_build_merkle_tree(cbmt_tree *tree,
                            cbmt_leaves *leaves,
+                           /* for saving nodes in tree */
                            cbmt_buffer nodes_buffer) {
   tree->nodes = nodes_buffer.data;
   tree->capacity = nodes_buffer.capacity / sizeof(cbmt_node);
@@ -547,12 +559,15 @@ int cbmt_build_merkle_tree(cbmt_tree *tree,
   return 0;
 }
 
-/* Allocate tree memory yourself */
+/* Allocate memory yourself */
 int cbmt_build_merkle_proof(cbmt_proof *proof,
                             cbmt_leaves *leaves,
                             cbmt_indices *leaf_indices,
+                            /* for saving nodes in tree */
                             cbmt_buffer nodes_buffer,
+                            /* for saving indices in proof */
                             cbmt_buffer indices_buffer,
+                            /* for saving lemmas in proof */
                             cbmt_buffer lemmas_buffer) {
   cbmt_tree tree;
   int ret = cbmt_build_merkle_tree(&tree, leaves, nodes_buffer);
