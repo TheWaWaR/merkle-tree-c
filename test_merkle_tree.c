@@ -6,6 +6,28 @@
 #include <stdio.h>
 #include <assert.h>
 
+#include <blake2b.h>
+
+cbmt_node node_merge(void *merge_ctx,
+                          cbmt_node *left,
+                          cbmt_node *right) {
+  cbmt_node ret;
+#ifdef CBMT_NODE_I32
+  int32_t left_value = *((int32_t *)left->bytes);
+  int32_t right_value = *((int32_t *)right->bytes);
+  int32_t value = right_value - left_value;
+  memcpy(ret.bytes, &value, 4);
+#else
+  blake2b_state *blake2b_ctx = (blake2b_ctx *)merge_ctx;
+  blake2b_init(blake2b_ctx, CBMT_NODE_SIZE);
+  blake2b_update(blake2b_ctx, left->bytes, CBMT_NODE_SIZE);
+  blake2b_update(blake2b_ctx, right->bytes, CBMT_NODE_SIZE);
+  blake2b_final(blake2b_ctx, ret.bytes, CBMT_NODE_SIZE);
+#endif
+  return ret;
+}
+
+
 cbmt_node int32_to_node(int32_t value) {
   cbmt_node node;
   memcpy(node.bytes, &value, sizeof(value));
@@ -41,7 +63,7 @@ void test_build_empty() {
   cbmt_tree tree;
   cbmt_leaves leaves;
   cbmt_leaves_init(&leaves, leaf_nodes, 0);
-  ret = cbmt_build_merkle_tree(&tree, &leaves, nodes_buffer);
+  ret = cbmt_build_merkle_tree(&tree, &leaves, node_merge, NULL, nodes_buffer);
   assert(ret == 0);
   assert(node_to_int32(cbmt_tree_root(&tree)) == 0);
   return;
@@ -63,7 +85,7 @@ void test_build_five() {
   leaf_nodes[3] = int32_to_node(7);
   leaf_nodes[4] = int32_to_node(11);
   cbmt_leaves_init(&leaves, leaf_nodes, 5);
-  ret = cbmt_build_merkle_tree(&tree, &leaves, nodes_buffer);
+  ret = cbmt_build_merkle_tree(&tree, &leaves, node_merge, NULL, nodes_buffer);
   assert(ret == 0);
 
   for (size_t i = 0; i < tree.length; i++) {
@@ -99,7 +121,7 @@ void test_build_root_directly() {
   leaf_nodes[4] = int32_to_node(11);
   cbmt_leaves_init(&leaves, leaf_nodes, 5);
   cbmt_node root;
-  ret = cbmt_build_merkle_root(&root, &leaves, nodes_buffer);
+  ret = cbmt_build_merkle_root(&root, &leaves, node_merge, NULL, nodes_buffer);
   assert(ret == 0);
   printf("root: %d\n", node_to_int32(root));
   assert(node_to_int32(root) == 4);
@@ -121,7 +143,7 @@ void test_rebuild_proof() {
   leaf_nodes[3] = int32_to_node(7);
   leaf_nodes[4] = int32_to_node(11);
   cbmt_leaves_init(&leaves, leaf_nodes, 5);
-  ret = cbmt_build_merkle_tree(&tree, &leaves, nodes_buffer);
+  ret = cbmt_build_merkle_tree(&tree, &leaves, node_merge, NULL, nodes_buffer);
   assert(ret == 0);
 
   cbmt_node root = cbmt_tree_root(&tree);
@@ -164,7 +186,7 @@ void test_rebuild_proof() {
   cbmt_buffer pairs_buffer;
   cbmt_buffer_init(&nodes_buffer2, nodes2, sizeof(nodes2));
   cbmt_buffer_init(&pairs_buffer, pairs, sizeof(pairs));
-  ret = cbmt_proof_verify(&proof, &root, &needed_leaves, nodes_buffer2, pairs_buffer);
+  ret = cbmt_proof_verify(&proof, &root, &needed_leaves, node_merge, NULL, nodes_buffer2, pairs_buffer);
   assert(ret == 0);
   return;
 }
