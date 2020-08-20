@@ -9,8 +9,8 @@
 #include <blake2b.h>
 
 cbmt_node node_merge(void *merge_ctx,
-                          cbmt_node *left,
-                          cbmt_node *right) {
+                     cbmt_node *left,
+                     cbmt_node *right) {
   cbmt_node ret;
 #ifdef CBMT_NODE_I32
   int32_t left_value = *((int32_t *)left->bytes);
@@ -26,7 +26,6 @@ cbmt_node node_merge(void *merge_ctx,
 #endif
   return ret;
 }
-
 
 cbmt_node int32_to_node(int32_t value) {
   cbmt_node node;

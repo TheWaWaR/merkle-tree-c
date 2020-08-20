@@ -375,10 +375,6 @@ int cbmt_proof_root(cbmt_proof *proof,
                           queue.length,
                           sizeof(cbmt_node_pair),
                           cbmt_node_pair_reverse_cmp);
-  for (size_t i = 0; i < queue.length; i++) {
-    cbmt_node_pair *pair = (cbmt_node_pair *)(queue.buffer.data + i * queue.width);
-  }
-
   size_t lemmas_offset = 0;
   cbmt_node_pair pair_current;
   cbmt_node_pair pair_sibling;
