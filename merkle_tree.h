@@ -1,7 +1,7 @@
 #ifndef CB_MERKLE_TREE_H_
 #define CB_MERKLE_TREE_H_
 
-#include <stdbool.h>
+ #include <stdbool.h>
 #include <string.h>
 
 #include <blake2b.h>
@@ -26,7 +26,7 @@
 #define cbmt_sibling(index)  ((index) == 0 ? 0 : ((index + 1) ^ 1) - 1)
 
 typedef int (*cmpfun)(const void *, const void *);
-void universal_swap(void *left, void *right, size_t width) {
+void cbmt_universal_swap(void *left, void *right, size_t width) {
   uint8_t tmp[128];
   size_t length;
   while (width) {
@@ -39,13 +39,13 @@ void universal_swap(void *left, void *right, size_t width) {
     width -= length;
   }
 }
-void simple_bubble_sort(void *base, size_t length, size_t width, cmpfun cmp) {
+void cbmt_simple_bubble_sort(void *base, size_t length, size_t width, cmpfun cmp) {
   for (size_t i = 0; i < length - 1; i++) {
     for (size_t j = i + 1; j < length; j++) {
       void *left = base + (i * width);
       void *right = base + (j * width);
       if (cmp(left, right) > 0) {
-        universal_swap(left, right, width);
+        cbmt_universal_swap(left, right, width);
       }
     }
   }
@@ -91,6 +91,7 @@ typedef struct {
   /* size_t capacity; */
 } cbmt_leaves;
 
+
 typedef struct {
   cbmt_buffer buffer;
   size_t width;
@@ -106,6 +107,20 @@ typedef struct {
   uint32_t index;
   cbmt_node node;
 } cbmt_node_pair;
+
+void cbmt_buffer_init(cbmt_buffer *buffer, void *data, size_t capacity) {
+  buffer->data = data;
+  buffer->capacity = capacity;
+}
+void cbmt_leaves_init(cbmt_leaves *leaves, cbmt_node *nodes, size_t length) {
+  leaves->length = length;
+  leaves->nodes = nodes;
+}
+void cbmt_indices_init(cbmt_indices *indices, uint32_t *values, size_t length, size_t capacity) {
+  indices->values = values;
+  indices->length = length;
+  indices->capacity = capacity;
+}
 
 int cbmt_queue_init(cbmt_queue *queue,
                    cbmt_buffer buffer,
@@ -227,7 +242,10 @@ int cbmt_tree_build_proof(cbmt_proof *proof,
   const uint32_t leaves_count = (uint32_t)((tree->length >> 1) + 1);
 
   cbmt_queue queue;
-  ret = cbmt_queue_init(&queue, indices_buffer, sizeof(uint32_t), indices_buffer.capacity / sizeof(uint32_t));
+  ret = cbmt_queue_init(&queue,
+                        indices_buffer,
+                        sizeof(uint32_t),
+                        indices_buffer.capacity / sizeof(uint32_t));
   if (ret != 0) {
     return ret;
   }
@@ -238,7 +256,10 @@ int cbmt_tree_build_proof(cbmt_proof *proof,
       return ret;
     }
   }
-  simple_bubble_sort(queue.buffer.data, leaf_indices->length, sizeof(uint32_t), uint32_reverse_cmp);
+  cbmt_simple_bubble_sort(queue.buffer.data,
+                          leaf_indices->length,
+                          sizeof(uint32_t),
+                          uint32_reverse_cmp);
   uint32_t first_value = *((uint32_t *)cbmt_queue_front(&queue));
   if (first_value >= ((leaves_count << 1) - 1)) {
     return CBMT_ERROR_BUILD_PROOF;
@@ -338,7 +359,10 @@ int cbmt_proof_root(cbmt_proof *proof,
     cbmt_node_copy(leaves_clone.nodes + i, leaves->nodes + i);
   }
   /* sort to align with indices */
-  simple_bubble_sort(leaves_clone.nodes, leaves_clone.length, sizeof(cbmt_node), cbmt_node_cmp);
+  cbmt_simple_bubble_sort(leaves_clone.nodes,
+                          leaves_clone.length,
+                          sizeof(cbmt_node),
+                          cbmt_node_cmp);
 
   int ret;
   cbmt_queue queue;
@@ -350,16 +374,17 @@ int cbmt_proof_root(cbmt_proof *proof,
     cbmt_node_pair pair;
     pair.index = proof->indices.values[i];
     cbmt_node_copy(&pair.node, leaves_clone.nodes + i);
-    /* printf("[before sort] index=%d, node=%d\n", pair.index, *((int32_t *)pair.node.bytes)); */
     ret = cbmt_queue_push_back(&queue, &pair);
     if (ret != 0) {
       return ret;
     }
   }
-  simple_bubble_sort(queue.buffer.data, queue.length, sizeof(cbmt_node_pair), cbmt_node_pair_reverse_cmp);
+  cbmt_simple_bubble_sort(queue.buffer.data,
+                          queue.length,
+                          sizeof(cbmt_node_pair),
+                          cbmt_node_pair_reverse_cmp);
   for (size_t i = 0; i < queue.length; i++) {
     cbmt_node_pair *pair = (cbmt_node_pair *)(queue.buffer.data + i * queue.width);
-    /* printf("index=%d, node=%d\n", pair->index, *((int32_t *)pair->node.bytes)); */
   }
 
   blake2b_state blake2b_ctx;
@@ -375,7 +400,6 @@ int cbmt_proof_root(cbmt_proof *proof,
     }
     index = pair_current.index;
     node = &pair_current.node;
-    /* printf(">> pop_front() index=%d, node=%d\n", index, *((int32_t *)node->bytes)); */
 
     if (index == 0) {
       if (proof->lemmas_length == lemmas_offset && queue.length == 0) {
@@ -407,8 +431,6 @@ int cbmt_proof_root(cbmt_proof *proof,
       cbmt_node_pair pair_parent;
       pair_parent.index = cbmt_parent(index);
       pair_parent.node = parent;
-      /* printf(">> sibling=%d\n", *((int32_t *)sibling->bytes)); */
-      /* printf(">> push_back(parent-index=%d, parent-node=%d)\n", pair_parent.index, *((int32_t *)parent.bytes)); */
       ret = cbmt_queue_push_back(&queue, &pair_parent);
       if (ret != 0) {
         return ret;
@@ -428,7 +450,6 @@ int cbmt_proof_verify(cbmt_proof *proof,
   if (ret != 0) {
     return ret;
   }
-  /* printf("root=%d, target_root=%d\n", *((int32_t *)root->bytes), *((int32_t *)target_root.bytes)); */
   if (memcmp(target_root.bytes, root->bytes, CBMT_NODE_SIZE) != 0) {
     return CBMT_ERROR_VERIFY_FAILED;
   }
@@ -457,10 +478,6 @@ int cbmt_build_merkle_root(cbmt_node *root, cbmt_leaves *leaves, cbmt_buffer nod
     cbmt_node *left = leaves->nodes + i - 1;
     cbmt_node *right = leaves->nodes + i;
     cbmt_node merged = cbmt_node_merge(&blake2b_ctx, left, right);
-    /* printf("push_back: leaf1=%d, leaf2=%d, merged=%d\n", */
-    /*        *((int32_t *)left->bytes), */
-    /*        *((int32_t *)right->bytes), */
-    /*        *((int32_t *)merged.bytes)); */
     ret = cbmt_queue_push_back(&queue, &merged);
     if (ret != 0) {
       return ret;
@@ -523,11 +540,6 @@ int cbmt_build_merkle_tree(cbmt_tree *tree,
       cbmt_node *left = tree->nodes + ((rev_idx << 1) + 1);
       cbmt_node *right = tree->nodes + ((rev_idx << 1) + 2);
       *target_node = cbmt_node_merge(&blake2b_ctx, left, right);
-      /* printf("i = %ld, left = %d, right = %d, merged = %d\n", */
-      /*        rev_idx, */
-      /*        *((int32_t *)left->bytes), */
-      /*        *((int32_t *)right->bytes), */
-      /*        *((int32_t *)target_node->bytes)); */
     }
   } else {
     tree->length = 0;

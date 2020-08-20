@@ -35,14 +35,12 @@ void test_build_empty() {
   cbmt_node leaf_nodes[256];
 
   cbmt_buffer nodes_buffer;
-  nodes_buffer.data = nodes;
-  nodes_buffer.capacity = sizeof(nodes);
+  cbmt_buffer_init(&nodes_buffer, nodes, sizeof(nodes));
 
   int ret;
   cbmt_tree tree;
   cbmt_leaves leaves;
-  leaves.nodes = leaf_nodes;
-  leaves.length = 0;
+  cbmt_leaves_init(&leaves, leaf_nodes, 0);
   ret = cbmt_build_merkle_tree(&tree, &leaves, nodes_buffer);
   assert(ret == 0);
   assert(node_to_int32(cbmt_tree_root(&tree)) == 0);
@@ -54,19 +52,17 @@ void test_build_five() {
   cbmt_node leaf_nodes[256];
 
   cbmt_buffer nodes_buffer;
-  nodes_buffer.data = nodes;
-  nodes_buffer.capacity = sizeof(nodes);
+  cbmt_buffer_init(&nodes_buffer, nodes, sizeof(nodes));
 
   int ret;
   cbmt_tree tree;
   cbmt_leaves leaves;
-  leaves.nodes = leaf_nodes;
-  leaves.length = 5;
-  leaves.nodes[0] = int32_to_node(2);
-  leaves.nodes[1] = int32_to_node(3);
-  leaves.nodes[2] = int32_to_node(5);
-  leaves.nodes[3] = int32_to_node(7);
-  leaves.nodes[4] = int32_to_node(11);
+  leaf_nodes[0] = int32_to_node(2);
+  leaf_nodes[1] = int32_to_node(3);
+  leaf_nodes[2] = int32_to_node(5);
+  leaf_nodes[3] = int32_to_node(7);
+  leaf_nodes[4] = int32_to_node(11);
+  cbmt_leaves_init(&leaves, leaf_nodes, 5);
   ret = cbmt_build_merkle_tree(&tree, &leaves, nodes_buffer);
   assert(ret == 0);
 
@@ -91,19 +87,17 @@ void test_build_root_directly() {
   cbmt_node leaf_nodes[256];
 
   cbmt_buffer nodes_buffer;
-  nodes_buffer.data = nodes;
-  nodes_buffer.capacity = sizeof(nodes);
+  cbmt_buffer_init(&nodes_buffer, nodes, sizeof(nodes));
 
   int ret;
   cbmt_tree tree;
   cbmt_leaves leaves;
-  leaves.nodes = leaf_nodes;
-  leaves.length = 5;
-  leaves.nodes[0] = int32_to_node(2);
-  leaves.nodes[1] = int32_to_node(3);
-  leaves.nodes[2] = int32_to_node(5);
-  leaves.nodes[3] = int32_to_node(7);
-  leaves.nodes[4] = int32_to_node(11);
+  leaf_nodes[0] = int32_to_node(2);
+  leaf_nodes[1] = int32_to_node(3);
+  leaf_nodes[2] = int32_to_node(5);
+  leaf_nodes[3] = int32_to_node(7);
+  leaf_nodes[4] = int32_to_node(11);
+  cbmt_leaves_init(&leaves, leaf_nodes, 5);
   cbmt_node root;
   ret = cbmt_build_merkle_root(&root, &leaves, nodes_buffer);
   assert(ret == 0);
@@ -116,19 +110,17 @@ void test_rebuild_proof() {
   cbmt_node leaf_nodes[256];
 
   cbmt_buffer nodes_buffer;
-  nodes_buffer.data = nodes;
-  nodes_buffer.capacity = sizeof(nodes);
+  cbmt_buffer_init(&nodes_buffer, nodes, sizeof(nodes));
 
   int ret;
   cbmt_tree tree;
   cbmt_leaves leaves;
-  leaves.nodes = leaf_nodes;
-  leaves.length = 5;
-  leaves.nodes[0] = int32_to_node(2);
-  leaves.nodes[1] = int32_to_node(3);
-  leaves.nodes[2] = int32_to_node(5);
-  leaves.nodes[3] = int32_to_node(7);
-  leaves.nodes[4] = int32_to_node(11);
+  leaf_nodes[0] = int32_to_node(2);
+  leaf_nodes[1] = int32_to_node(3);
+  leaf_nodes[2] = int32_to_node(5);
+  leaf_nodes[3] = int32_to_node(7);
+  leaf_nodes[4] = int32_to_node(11);
+  cbmt_leaves_init(&leaves, leaf_nodes, 5);
   ret = cbmt_build_merkle_tree(&tree, &leaves, nodes_buffer);
   assert(ret == 0);
 
@@ -136,18 +128,14 @@ void test_rebuild_proof() {
   cbmt_proof proof;
   uint32_t leaf_index_values[2] = { 0, 3 };
   cbmt_indices leaf_indices;
-  leaf_indices.values = leaf_index_values;
-  leaf_indices.length = 2;
-  leaf_indices.capacity = 2;
+  cbmt_indices_init(&leaf_indices, leaf_index_values, 2, 2);
 
-  uint32_t leaf_values_buffer[256];
+  uint32_t leaf_values_data[256];
   cbmt_node lemmas_nodes[256];
   cbmt_buffer indices_buffer;
   cbmt_buffer lemmas_buffer;
-  indices_buffer.data = leaf_values_buffer;
-  indices_buffer.capacity = 256;
-  lemmas_buffer.data = lemmas_nodes;
-  lemmas_buffer.capacity = 256;
+  cbmt_buffer_init(&indices_buffer, leaf_values_data, sizeof(leaf_values_data));
+  cbmt_buffer_init(&lemmas_buffer, lemmas_nodes, sizeof(lemmas_nodes));
   ret = cbmt_tree_build_proof(&proof, &tree, &leaf_indices, indices_buffer, lemmas_buffer);
   assert(ret == 0);
   printf("proof.indices.length=%ld, proof.lemmas_length=%ld\n",
@@ -162,8 +150,7 @@ void test_rebuild_proof() {
 
   cbmt_node needed_nodes[256];
   cbmt_leaves needed_leaves;
-  needed_leaves.nodes = needed_nodes;
-  needed_leaves.length = leaf_indices.length;
+  cbmt_leaves_init(&needed_leaves, needed_nodes, leaf_indices.length);
   for (size_t i = 0; i < needed_leaves.length; i++) {
     needed_leaves.nodes[i] = tree.nodes[proof.indices.values[i]];
     printf("[needed] index=%d, node=%d\n",
@@ -171,15 +158,12 @@ void test_rebuild_proof() {
            node_to_int32(tree.nodes[proof.indices.values[i]]));
   }
 
-
   cbmt_node nodes2[1024];
   cbmt_node_pair pairs[1024];
   cbmt_buffer nodes_buffer2;
   cbmt_buffer pairs_buffer;
-  nodes_buffer2.data = nodes2;
-  nodes_buffer2.capacity = sizeof(nodes2);
-  pairs_buffer.data = pairs;
-  pairs_buffer.capacity = sizeof(pairs);
+  cbmt_buffer_init(&nodes_buffer2, nodes2, sizeof(nodes2));
+  cbmt_buffer_init(&pairs_buffer, pairs, sizeof(pairs));
   ret = cbmt_proof_verify(&proof, &root, &needed_leaves, nodes_buffer2, pairs_buffer);
   assert(ret == 0);
   return;
