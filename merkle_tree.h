@@ -469,7 +469,7 @@ int cbmt_build_merkle_root(cbmt_node *root,
   if (ret != 0) {
     return ret;
   }
-  for (int i = length - 1; i > 1; i -= 2) {
+  for (int i = length - 1; i > 0; i -= 2) {
     cbmt_node *left = leaves->nodes + i - 1;
     cbmt_node *right = leaves->nodes + i;
     cbmt_node merged = merge(merge_ctx, left, right);

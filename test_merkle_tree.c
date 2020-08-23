@@ -39,6 +39,7 @@ int32_t node_to_int32(cbmt_node node) {
 
 void test_build_empty();
 void test_build_five();
+void test_build_root_directly_2leaves();
 void test_build_root_directly();
 void test_rebuild_proof();
 void test_build_proof();
@@ -46,6 +47,7 @@ void test_build_proof();
 int main() {
   test_build_empty();
   test_build_five();
+  test_build_root_directly_2leaves();
   test_build_root_directly();
   test_rebuild_proof();
   test_build_proof();
@@ -101,6 +103,27 @@ void test_build_five() {
   assert(node_to_int32(tree.nodes[7]) == 7);
   assert(node_to_int32(tree.nodes[8]) == 11);
   return;
+}
+
+
+void test_build_root_directly_2leaves() {
+  cbmt_node nodes[1024];
+  cbmt_node leaf_nodes[256];
+
+  cbmt_buffer nodes_buffer;
+  cbmt_buffer_init(&nodes_buffer, nodes, sizeof(nodes));
+
+  int ret;
+  cbmt_tree tree;
+  cbmt_leaves leaves;
+  leaf_nodes[0] = int32_to_node(2);
+  leaf_nodes[1] = int32_to_node(3);
+  cbmt_leaves_init(&leaves, leaf_nodes, 2);
+  cbmt_node root;
+  ret = cbmt_build_merkle_root(&root, &leaves, node_merge, NULL, nodes_buffer);
+  assert(ret == 0);
+  printf("root: %d\n", node_to_int32(root));
+  assert(node_to_int32(root) == 1);
 }
 
 void test_build_root_directly() {
