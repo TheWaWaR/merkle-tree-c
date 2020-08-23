@@ -253,7 +253,7 @@ int cbmt_tree_build_proof(cbmt_proof *proof,
     return CBMT_ERROR_BUILD_PROOF;
   }
 
-  proof->lemmas = lemmas_buffer.data;
+  proof->lemmas = (cbmt_node *)lemmas_buffer.data;
   proof->lemmas_length = 0;
   uint32_t index;
   while (queue.length > 0) {
@@ -269,7 +269,7 @@ int cbmt_tree_build_proof(cbmt_proof *proof,
     }
 
     uint32_t sibling = cbmt_sibling(index);
-    uint32_t *front = cbmt_queue_front(&queue);
+    uint32_t *front = (uint32_t *)cbmt_queue_front(&queue);
     if (front != NULL && *front == sibling) {
       uint32_t tmp;
       ret = cbmt_queue_pop_front(&queue, &tmp);
@@ -293,7 +293,7 @@ int cbmt_tree_build_proof(cbmt_proof *proof,
   }
 
   cbmt_indices indices;
-  indices.values = indices_buffer.data;
+  indices.values = (uint32_t *)indices_buffer.data;
   indices.length = leaf_indices->length;
   indices.capacity = indices_buffer.capacity / sizeof(uint32_t);
   for (size_t i = 0; i < indices.length; i++) {
@@ -345,7 +345,7 @@ int cbmt_proof_root(cbmt_proof *proof,
   }
 
   cbmt_leaves leaves_clone;
-  leaves_clone.nodes = nodes_buffer.data;
+  leaves_clone.nodes = (cbmt_node *)nodes_buffer.data;
   leaves_clone.length = leaves->length;
   for (size_t i = 0; i < leaves->length; i++) {
     cbmt_node_copy(leaves_clone.nodes + i, leaves->nodes + i);
@@ -397,7 +397,7 @@ int cbmt_proof_root(cbmt_proof *proof,
       }
     }
 
-    cbmt_node_pair *pair_front = cbmt_queue_front(&queue);
+    cbmt_node_pair *pair_front = (cbmt_node_pair *)cbmt_queue_front(&queue);
     cbmt_node *sibling = NULL;
     if (pair_front != NULL && pair_front->index == cbmt_sibling(index)) {
       ret = cbmt_queue_pop_front(&queue, &pair_sibling);
@@ -515,7 +515,7 @@ int cbmt_build_merkle_tree(cbmt_tree *tree,
                            void *merge_ctx,
                            /* for saving nodes in tree */
                            cbmt_buffer nodes_buffer) {
-  tree->nodes = nodes_buffer.data;
+  tree->nodes = (cbmt_node *)nodes_buffer.data;
   tree->capacity = nodes_buffer.capacity / sizeof(cbmt_node);
   if (leaves->length > 0) {
     size_t length = leaves->length * 2 - 1;
